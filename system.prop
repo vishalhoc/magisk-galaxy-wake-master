@@ -1,0 +1,4 @@
+# Galaxy Wake Master System Properties
+# Author: hoc
+ro.wake_master.version=1.0
+persist.sys.wake_master.enabled=1

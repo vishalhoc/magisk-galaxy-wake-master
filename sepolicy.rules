@@ -1,0 +1,6 @@
+allow magisk input_device dir { read open search getattr };
+allow magisk input_device chr_file { read write open ioctl getattr };
+allow magisk sysfs file { read write open getattr };
+allow magisk sysfs_sensors file { read write open getattr };
+allow system_server input_device chr_file { read write open ioctl getattr };
+allow system_app input_device chr_file { read write open ioctl getattr };

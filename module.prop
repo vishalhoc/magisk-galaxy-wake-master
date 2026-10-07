@@ -1,0 +1,7 @@
+id=galaxy_wake_master
+name=Galaxy Wake Master (Volume Wake & Put-Down Sleep)
+version=v1.0
+versionCode=100
+author=hoc
+description=Wake device using Volume Up/Down keys to bypass broken power button. Includes "Put Down to Sleep" (Face-down & pocket auto-sleep) with Web UI control on Port 8096.
+minMagisk=24000

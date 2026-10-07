@@ -1,0 +1,28 @@
+#!/system/bin/sh
+#################
+# Magisk Module Flashable Script
+#################
+OUTFD=$2
+ZIPFILE=$3
+
+# Load magisk util functions
+if [ -f /data/adb/magisk/util_functions.sh ]; then
+    . /data/adb/magisk/util_functions.sh
+else
+    ui_print() { echo "$1"; }
+fi
+
+install_module() {
+    export ASH_STANDALONE=1
+    TMPDIR=/dev/tmp
+    mkdir -p $TMPDIR
+    unzip -o "$ZIPFILE" -d $TMPDIR >&2
+    MODPATH=/data/adb/modules_update/$(grep_prop id $TMPDIR/module.prop)
+    mkdir -p $MODPATH
+    cp -af $TMPDIR/* $MODPATH/
+    rm -rf $TMPDIR
+    [ -f "$MODPATH/customize.sh" ] && . "$MODPATH/customize.sh"
+}
+
+install_module
+exit 0

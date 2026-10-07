@@ -1,0 +1,431 @@
+#!/system/bin/sh
+# ================================================================
+# Galaxy Wake Master - Daemon & Guardian Engine
+# Author: hoc
+# ================================================================
+
+CFG_FILE="/data/adb/galaxy_wake_master.cfg"
+DEFAULT_CFG="/data/adb/modules/galaxy_wake_master/default.cfg"
+LOG_FILE="/data/local/tmp/galaxy_wake_master.log"
+PID_FILE="/data/local/tmp/galaxy_wake_master.pid"
+SENSOR_CACHE="/data/local/tmp/wake_sensor.tmp"
+
+# Fallback defaults
+VOL_UP_WAKE=1
+VOL_DOWN_WAKE=1
+DROP_VOL_ON_WAKE=1
+HEADSET_HOOK_WAKE=0
+PUT_DOWN_SLEEP=1
+FACE_DOWN_SLEEP=1
+POCKET_SLEEP=1
+FLAT_TABLE_SLEEP=0
+SLEEP_DELAY=2
+HW_SYSFS_WAKE=1
+VIBRATE_FEEDBACK=1
+WEB_PORT=8096
+
+log_msg() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+}
+
+load_config() {
+    if [ ! -f "$CFG_FILE" ] && [ -f "$DEFAULT_CFG" ]; then
+        cp -f "$DEFAULT_CFG" "$CFG_FILE" 2>/dev/null
+    fi
+    if [ -f "$CFG_FILE" ]; then
+        . "$CFG_FILE" 2>/dev/null
+    fi
+}
+
+# Apply Hardware & Sysfs Wakeup
+apply_hw_wakeup() {
+    if [ "$HW_SYSFS_WAKE" != "1" ]; then
+        return 0
+    fi
+
+    # 1. Samsung sec_key kernel driver wakeup keys (Power 116, Home 172, VolDown 114, VolUp 115)
+    if [ -f /sys/class/sec/sec_key/wakeup_keys ]; then
+        echo "114,115,116,172" > /sys/class/sec/sec_key/wakeup_keys 2>/dev/null
+        log_msg "Samsung sec_key wakeup_keys set to 114,115,116,172"
+    fi
+
+    # 2. Kernel input wakeup sources & keypad power
+    if [ -f /sys/devices/platform/10010000.kp/power/control ]; then
+        echo "on" > /sys/devices/platform/10010000.kp/power/control 2>/dev/null
+    fi
+    for w in /sys/class/input/input*/device/power/wakeup \
+             /sys/class/input/input*/power/wakeup \
+             /sys/devices/platform/*kpd*/power/wakeup \
+             /sys/devices/platform/*gpio*keys*/power/wakeup; do
+        if [ -f "$w" ]; then
+            echo "enabled" > "$w" 2>/dev/null
+        fi
+    done
+}
+
+# Haptic feedback
+trigger_vibrate() {
+    [ "$VIBRATE_FEEDBACK" != "1" ] && return
+    dur=${1:-40}
+    if [ -f /sys/class/timed_output/vibrator/enable ]; then
+        echo "$dur" > /sys/class/timed_output/vibrator/enable 2>/dev/null
+    elif [ -f /sys/class/sec/vibrator/vibrator_enable ]; then
+        echo "$dur" > /sys/class/sec/vibrator/vibrator_enable 2>/dev/null
+    else
+        cmd vibrator vibrate "$dur" 2>/dev/null || true
+    fi
+}
+
+# Check if screen is currently ON
+is_screen_on() {
+    # Method 1: dumpsys power mWakefulness (fast & standard)
+    if dumpsys power 2>/dev/null | grep -q "mWakefulness=Awake"; then
+        return 0
+    fi
+    # Method 2: dumpsys display
+    if dumpsys display 2>/dev/null | grep -q "mScreenState=ON"; then
+        return 0
+    fi
+    # Method 3: window manager
+    if dumpsys window 2>/dev/null | grep -q "mScreenOn=true"; then
+        return 0
+    fi
+    return 1
+}
+
+# Find Proximity Sensor Sysfs Path
+find_prox_path() {
+    for p in /sys/class/sensors/proximity_sensor/state \
+             /sys/devices/virtual/sensors/proximity_sensor/state \
+             /sys/class/sensors/proximity_sensor/raw_data \
+             /sys/class/sec/tsp/virtual_prox \
+             /sys/class/sensors/grip_sensor/state; do
+        if [ -f "$p" ]; then
+            echo "$p"
+            return
+        fi
+    done
+    echo ""
+}
+
+# Read Proximity Sensor: 1 = NEAR (covered/close), 0 = FAR (open air)
+read_proximity() {
+    prox_path=$(find_prox_path)
+    if [ -n "$prox_path" ] && [ -r "$prox_path" ]; then
+        val=$(cat "$prox_path" 2>/dev/null | head -n1 | tr -d '\r\n')
+        # Typical Samsung proximity: 1 or 1,x = NEAR; 0 = FAR
+        case "$val" in
+            1*|NEAR*|near*|close*) echo "1" ;;
+            *) echo "0" ;;
+        esac
+        return
+    fi
+
+    # Fallback to dumpsys sensorservice
+    if dumpsys sensorservice 2>/dev/null | grep -A 2 -i "proximity" | grep -q -E "0\.00| 0 |0$"; then
+        echo "1" # in Android Sensor API, 0.0 cm is NEAR
+    else
+        echo "0"
+    fi
+}
+
+# Find Accelerometer Sysfs Path
+find_accel_path() {
+    for a in /sys/class/sensors/accelerometer_sensor/raw_data \
+             /sys/devices/virtual/sensors/accelerometer_sensor/raw_data \
+             /sys/class/sensors/accelerometer_sensor/data \
+             /sys/bus/iio/devices/iio:device0/in_accel_z_raw; do
+        if [ -f "$a" ]; then
+            echo "$a"
+            return
+        fi
+    done
+    echo ""
+}
+
+# Read Accelerometer: returns "X,Y,Z"
+read_accel() {
+    accel_path=$(find_accel_path)
+    if [ -n "$accel_path" ] && [ -r "$accel_path" ]; then
+        cat "$accel_path" 2>/dev/null | head -n1 | tr -d '\r\n '
+        return
+    fi
+    # Default upright face-up: 0, 0, 1000
+    echo "0,0,1000"
+}
+
+# Analyze orientation from accelerometer raw data
+# Returns: FACE_UP, FACE_DOWN, POCKET_DOWN, TILTED
+get_orientation() {
+    raw=$(read_accel)
+    IFS=',' read -r x y z <<EOF
+$raw
+EOF
+    # Clean integers
+    x=${x%%.*}; [ -z "$x" ] && x=0
+    y=${y%%.*}; [ -z "$y" ] && y=0
+    z=${z%%.*}; [ -z "$z" ] && z=0
+
+    # Handle both milli-g scale (~1000) and m/s^2 scale (~10)
+    # If scale is m/s^2, |z| is around 7-10. If milli-g, around 700-1000.
+    if [ "$z" -le -500 ] || { [ "$z" -le -5 ] && [ "$z" -ge -50 ]; }; then
+        echo "FACE_DOWN"
+    elif [ "$z" -ge 500 ] || { [ "$z" -ge 5 ] && [ "$z" -le 50 ]; }; then
+        echo "FACE_UP"
+    elif [ "$y" -le -500 ] || { [ "$y" -le -5 ] && [ "$y" -ge -50 ]; }; then
+        echo "POCKET_DOWN"
+    else
+        echo "TILTED"
+    fi
+}
+
+# Volume event compensation
+compensate_vol() {
+    key_type="$1"
+    [ "$DROP_VOL_ON_WAKE" != "1" ] && return
+
+    # Slight pause to let framework finish key registration
+    usleep 120000 2>/dev/null || sleep 0.12
+    if [ "$key_type" = "UP" ]; then
+        # Vol Up was pressed: step down to compensate
+        cmd media_session volume --stream 3 --adj -1 2>/dev/null || true
+    elif [ "$key_type" = "DOWN" ]; then
+        # Vol Down was pressed: step up to compensate
+        cmd media_session volume --stream 3 --adj 1 2>/dev/null || true
+    fi
+}
+
+# Wake Screen Trigger
+trigger_wake() {
+    key_source="${1:-Daemon}"
+    log_msg "Wake triggered by $key_source"
+    input keyevent 224 2>/dev/null || input keyevent 26 2>/dev/null
+    trigger_vibrate 35
+}
+
+# Sleep Screen Trigger
+trigger_sleep() {
+    reason="${1:-Put-Down}"
+    log_msg "Sleep triggered: $reason"
+    input keyevent 223 2>/dev/null || input keyevent 26 2>/dev/null
+    trigger_vibrate 60
+}
+
+# Worker 1: Real-time Key Event Listener via getevent
+run_key_listener() {
+    log_msg "Starting real-time key event listener..."
+    
+    getevent -l 2>/dev/null | while read -r dev type code value; do
+        # We only care about EV_KEY DOWN events
+        case "$type" in
+            *EV_KEY*)
+                case "$value" in
+                    *DOWN*)
+                        case "$code" in
+                            *KEY_VOLUMEUP*)
+                                if ! is_screen_on; then
+                                    load_config
+                                    if [ "$VOL_UP_WAKE" = "1" ]; then
+                                        trigger_wake "Volume UP"
+                                        compensate_vol "UP" &
+                                    fi
+                                fi
+                                ;;
+                            *KEY_VOLUMEDOWN*)
+                                if ! is_screen_on; then
+                                    load_config
+                                    if [ "$VOL_DOWN_WAKE" = "1" ]; then
+                                        trigger_wake "Volume DOWN"
+                                        compensate_vol "DOWN" &
+                                    fi
+                                fi
+                                ;;
+                            *KEY_HEADSETHOOK*|*KEY_MEDIA*)
+                                if ! is_screen_on; then
+                                    load_config
+                                    if [ "$HEADSET_HOOK_WAKE" = "1" ]; then
+                                        trigger_wake "Headset Media Key"
+                                    fi
+                                fi
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    done
+}
+
+# Worker 2: "Put Down to Sleep" (Wake-Down) Guardian
+# CRITICAL: ONLY polls when screen is ON. Pauses when screen is OFF.
+run_putdown_guardian() {
+    log_msg "Starting Put-Down to Sleep guardian..."
+    PERSIST_COUNT=0
+
+    while true; do
+        load_config
+
+        # If Put-Down feature is turned off in config, sleep 3s
+        if [ "$PUT_DOWN_SLEEP" != "1" ]; then
+            sleep 3
+            continue
+        fi
+
+        # ZERO BATTERY DRAIN:
+        # If screen is OFF, sleep and DO NOT read sensors!
+        if ! is_screen_on; then
+            PERSIST_COUNT=0
+            sleep 2
+            continue
+        fi
+
+        # Screen is ON: read sensors
+        prox=$(read_proximity)
+        orient=$(get_orientation)
+        
+        # Cache readings for Web UI live display
+        echo "PROX=$prox;ORIENT=$orient;TIME=$(date +%s)" > "$SENSOR_CACHE" 2>/dev/null
+
+        SHOULD_SLEEP=0
+        SLEEP_REASON=""
+
+        # Condition 1: Face-Down (Proximity NEAR + Phone facing down)
+        if [ "$FACE_DOWN_SLEEP" = "1" ] && [ "$prox" = "1" ] && [ "$orient" = "FACE_DOWN" ]; then
+            SHOULD_SLEEP=1
+            SLEEP_REASON="Face-down on surface"
+        # Condition 2: Pocket Auto-Sleep (Proximity NEAR + Vertical upside down)
+        elif [ "$POCKET_SLEEP" = "1" ] && [ "$prox" = "1" ] && [ "$orient" = "POCKET_DOWN" ]; then
+            SHOULD_SLEEP=1
+            SLEEP_REASON="Placed in pocket upside-down"
+        # Condition 3: Flat Table (Screen up, flat)
+        elif [ "$FLAT_TABLE_SLEEP" = "1" ] && [ "$orient" = "FACE_UP" ]; then
+            SHOULD_SLEEP=1
+            SLEEP_REASON="Flat on table"
+        fi
+
+        if [ "$SHOULD_SLEEP" = "1" ]; then
+            PERSIST_COUNT=$((PERSIST_COUNT + 1))
+            required_ticks=${SLEEP_DELAY:-2}
+            if [ $PERSIST_COUNT -ge $required_ticks ]; then
+                trigger_sleep "$SLEEP_REASON"
+                PERSIST_COUNT=0
+                sleep 2
+            fi
+        else
+            PERSIST_COUNT=0
+        fi
+
+        sleep 1
+    done
+}
+
+# Start full daemon
+daemon_run() {
+    echo $$ > "$PID_FILE"
+    load_config
+    apply_hw_wakeup
+    log_msg "Galaxy Wake Master Daemon started (PID: $$)"
+
+    # Spawn Put-down guardian in background subshell
+    run_putdown_guardian &
+    GUARDIAN_PID=$!
+
+    # Run key listener in foreground of daemon
+    run_key_listener
+
+    # If key listener exits, kill guardian too
+    kill -9 "$GUARDIAN_PID" 2>/dev/null
+    rm -f "$PID_FILE"
+}
+
+# Main CLI dispatch
+case "$1" in
+    start)
+        load_config
+        apply_hw_wakeup
+        if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null; then
+            echo "Galaxy Wake Master is already running (PID: $(cat "$PID_FILE"))."
+            exit 0
+        fi
+        nohup "$0" run >/dev/null 2>&1 &
+        echo "Galaxy Wake Master daemon launched."
+        ;;
+    stop)
+        if [ -f "$PID_FILE" ]; then
+            pid=$(cat "$PID_FILE" 2>/dev/null)
+            pkill -P "$pid" 2>/dev/null
+            kill -9 "$pid" 2>/dev/null
+            rm -f "$PID_FILE"
+            echo "Galaxy Wake Master stopped."
+        else
+            pkill -f "wake_master run" 2>/dev/null
+            echo "Stopped."
+        fi
+        ;;
+    restart)
+        "$0" stop
+        sleep 1
+        "$0" start
+        ;;
+    run)
+        daemon_run
+        ;;
+    apply_hw)
+        load_config
+        apply_hw_wakeup
+        echo "Hardware sysfs wakeup applied."
+        ;;
+    wake)
+        trigger_wake "Manual CLI Trigger"
+        ;;
+    sleep)
+        trigger_sleep "Manual CLI Trigger"
+        ;;
+    power_menu)
+        log_msg "Power menu requested via CLI"
+        input keyevent --longpress 26 2>/dev/null || am broadcast -a android.intent.action.ACTION_SHOW_POWER_DIALOG 2>/dev/null || true
+        ;;
+    status)
+        load_config
+        if is_screen_on; then
+            scr="AWAKE"
+        else
+            scr="ASLEEP"
+        fi
+        prox=$(read_proximity)
+        orient=$(get_orientation)
+        echo "=========================================="
+        echo " Galaxy Wake Master Status"
+        echo "=========================================="
+        echo "Screen State:        $scr"
+        echo "Proximity:           $( [ "$prox" = "1" ] && echo "NEAR" || echo "FAR" )"
+        echo "Device Orientation:  $orient"
+        echo "Vol UP Wake:         $VOL_UP_WAKE"
+        echo "Vol DOWN Wake:       $VOL_DOWN_WAKE"
+        echo "Put-Down Sleep:      $PUT_DOWN_SLEEP"
+        echo "Face-Down Sleep:     $FACE_DOWN_SLEEP"
+        echo "Pocket Sleep:        $POCKET_SLEEP"
+        echo "Sleep Delay:         ${SLEEP_DELAY}s"
+        echo "Web UI Port:         $WEB_PORT"
+        if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE" 2>/dev/null)" 2>/dev/null; then
+            echo "Daemon Status:       RUNNING (PID $(cat "$PID_FILE"))"
+        else
+            echo "Daemon Status:       STOPPED"
+        fi
+        echo "=========================================="
+        ;;
+    sensors)
+        prox=$(read_proximity)
+        accel=$(read_accel)
+        orient=$(get_orientation)
+        echo "Proximity: $prox (1=NEAR, 0=FAR)"
+        echo "Accel XYZ: $accel"
+        echo "Orientation: $orient"
+        ;;
+    *)
+        echo "Usage: wake_master {start|stop|restart|run|status|wake|sleep|power_menu|sensors|apply_hw}"
+        exit 1
+        ;;
+esac
+
+exit 0

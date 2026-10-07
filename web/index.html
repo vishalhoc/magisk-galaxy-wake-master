@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Galaxy Wake Master</title>
+    <style>
+        :root {
+            --bg-base: #090d16;
+            --bg-card: rgba(18, 24, 38, 0.75);
+            --bg-card-hover: rgba(26, 34, 52, 0.85);
+            --border-card: rgba(255, 255, 255, 0.08);
+            --border-active: rgba(6, 182, 212, 0.4);
+            --accent-cyan: #06b6d4;
+            --accent-teal: #14b8a6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --accent-amber: #f59e0b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.12) 0%, transparent 60%),
+                              radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.08) 0%, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 16px 14px 100px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Glassmorphism Cards */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-card);
+            border-radius: 20px;
+            padding: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+            transition: border-color 0.25s, transform 0.2s;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .brand-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(6, 182, 212, 0.35);
+        }
+
+        .logo-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: #ffffff;
+        }
+
+        .title-box h1 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            background: linear-gradient(90deg, #ffffff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .title-box p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent-green);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        /* Section Titles */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-main);
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--accent-cyan);
+        }
+
+        .tag-pill {
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.25);
+        }
+
+        /* Quick Action Grid (Virtual Power Controls) */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-card);
+            border-radius: 14px;
+            padding: 14px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .action-btn:active {
+            transform: scale(0.96);
+            background: rgba(6, 182, 212, 0.12);
+            border-color: var(--accent-cyan);
+        }
+
+        .action-btn.primary {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(20, 184, 166, 0.2));
+            border-color: rgba(6, 182, 212, 0.4);
+        }
+
+        .action-btn.danger {
+            background: rgba(239, 68, 68, 0.12);
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .action-btn svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+        }
+
+        .action-btn span {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .action-btn small {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        /* Setting Item Row */
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-info {
+            flex: 1;
+            padding-right: 14px;
+        }
+
+        .setting-name {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 2px;
+        }
+
+        .setting-desc {
+            font-size: 11.5px;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        /* iOS / One UI Style Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.12);
+            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 34px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 2px;
+            background-color: white;
+            transition: .25s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(19px);
+        }
+
+        /* Range Slider */
+        .slider-box {
+            padding: 12px 0 6px;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .slider-val {
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+        }
+
+        /* Live Sensor Radar Box */
+        .sensor-dashboard {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .sensor-card {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .sensor-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .sensor-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .sensor-value.near {
+            color: var(--accent-amber);
+        }
+
+        .sensor-value.far {
+            color: var(--accent-teal);
+        }
+
+        .sensor-value.face-down {
+            color: var(--accent-red);
+        }
+
+        /* Notice & Tips */
+        .notice-box {
+            background: rgba(6, 182, 212, 0.08);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 12px;
+            padding: 12px;
+            font-size: 11.5px;
+            color: var(--text-muted);
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 12px;
+        }
+
+        .notice-box svg {
+            width: 18px;
+            height: 18px;
+            fill: var(--accent-cyan);
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* Bottom Sticky Bar */
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid var(--border-card);
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-teal));
+            border: none;
+            color: #0b1120;
+            font-weight: 700;
+            font-size: 13px;
+            padding: 10px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.4);
+            transition: transform 0.15s, opacity 0.15s;
+        }
+
+        .btn-save:active {
+            transform: scale(0.96);
+        }
+
+        /* Toast feedback */
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-60px);
+            background: var(--bg-card);
+            border: 1px solid var(--accent-cyan);
+            color: var(--text-main);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 12.5px;
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .log-box {
+            background: #05070c;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #a5f3fc;
+            height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            border: 1px solid var(--border-card);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="toast" class="toast">
+        <span id="toast-text">Settings Saved!</span>
+    </div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="brand-box">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42A7.92 7.92 0 0 1 20 12c0 4.41-3.59 8-8 8s-8-3.59-8-8c0-2.38 1.05-4.52 2.73-5.99L5.31 4.59C3.26 6.39 2 9.04 2 12c0 5.52 4.48 10 10 10s10-4.48 10-10c0-2.96-1.26-5.61-3.17-7.83z"/></svg>
+                </div>
+                <div class="title-box">
+                    <h1>Galaxy Wake Master</h1>
+                    <p id="dev-info">Power Button Replacement & Sleep Engine</p>
+                </div>
+            </div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                <span id="screen-state-text">AWAKE</span>
+            </div>
+        </header>
+
+        <!-- Emergency Virtual Power Panel -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    Emergency Power Controls
+                </div>
+                <span class="tag-pill">Broken Button Fix</span>
+            </div>
+            <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px;">
+                Instant on-screen controls to sleep, wake, or open the shutdown dialog without using the physical power button.
+            </p>
+
+            <div class="actions-grid">
+                <button class="action-btn primary" onclick="callApi('sleep')">
+                    <svg viewBox="0 0 24 24"><path d="M12.3 2a10 10 0 0 0-1.9 19.8 10 10 0 0 0 11.4-11.4A10 10 0 0 1 12.3 2z"/></svg>
+                    <span>Sleep Screen</span>
+                    <small>Lock & Turn Off</small>
+                </button>
+
+                <button class="action-btn" onclick="callApi('wake')">
+                    <svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0-5c-.55 0-1 .45-1 1v2c0 .55.45 1 1 1s1-.45 1-1V3c0-.55-.45-1-1-1zm0 16c-.55 0-1 .45-1 1v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1zm8-9h-2c-.55 0-1 .45-1 1s.45 1 1 1h2c.55 0 1-.45 1-1s-.45-1-1-1zm-14 0H4c-.55 0-1 .45-1 1s.45 1 1 1h2c.55 0 1-.45 1-1s-.45-1-1-1z"/></svg>
+                    <span>Wake Screen</span>
+                    <small>Display On</small>
+                </button>
+
+                <button class="action-btn danger" onclick="callApi('power_menu')">
+                    <svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17l-1.42 1.42A7.92 7.92 0 0 1 20 12c0 4.41-3.59 8-8 8s-8-3.59-8-8c0-2.38 1.05-4.52 2.73-5.99L5.31 4.59C3.26 6.39 2 9.04 2 12c0 5.52 4.48 10 10 10s10-4.48 10-10c0-2.96-1.26-5.61-3.17-7.83z"/></svg>
+                    <span>Power Menu</span>
+                    <small>Restart / Shutdown</small>
+                </button>
+
+                <button class="action-btn" onclick="callApi('screenshot')">
+                    <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    <span>Screenshot</span>
+                    <small>Simulate Pwr+VolDown</small>
+                </button>
+            </div>
+        </div>
+
+        <!-- Volume Button Wake Settings -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    Volume Wake (Select Keys)
+                </div>
+                <span class="tag-pill">Key Options</span>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Volume UP to Wake</div>
+                    <div class="setting-desc">Press Volume Up while screen is off to wake device</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_vol_up" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Volume DOWN to Wake</div>
+                    <div class="setting-desc">Press Volume Down while screen is off to wake device</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_vol_down" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Drop Volume Event on Wake</div>
+                    <div class="setting-desc">Prevents volume level changes when waking up the display</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_drop_vol" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Headset / Media Key Wake</div>
+                    <div class="setting-desc">Wake screen using headphone or Bluetooth play button</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_headset_hook">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Haptic Feedback</div>
+                    <div class="setting-desc">Vibrate gently upon button wake & put-down sleep</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_vibrate" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="notice-box">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <div>
+                    <strong>Dual-Layer Hardware Wake:</strong> Works via Samsung kernel <code>sec_key</code> driver and Magisk overlay for instant wakeups even during deep sleep.
+                </div>
+            </div>
+        </div>
+
+        <!-- Put Down to Sleep (Wake-Down Engine) -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/></svg>
+                    Put Down to Sleep (Wake-Down)
+                </div>
+                <span class="tag-pill" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); border-color: rgba(139, 92, 246, 0.3);">Lift-to-Wake Companion</span>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Enable Put-Down to Sleep</div>
+                    <div class="setting-desc">Master switch: Auto-sleep when device is set down or pocketed</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_put_down" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Face-Down Auto-Sleep</div>
+                    <div class="setting-desc">Turns off screen when placed screen-down on table or desk</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_face_down" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Pocket Auto-Sleep</div>
+                    <div class="setting-desc">Turns off screen when placed upside-down in your pocket</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_pocket" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-name">Flat Table Auto-Sleep</div>
+                    <div class="setting-desc">Auto-sleep when resting flat screen-up on table</div>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="cfg_flat_table">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="slider-box">
+                <div class="slider-header">
+                    <span>Trigger Delay Before Sleep</span>
+                    <span class="slider-val" id="delay-val">2.0s</span>
+                </div>
+                <input type="range" id="cfg_delay" min="1" max="5" step="0.5" value="2" oninput="document.getElementById('delay-val').innerText = this.value + 's'">
+            </div>
+
+            <div class="notice-box" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2);">
+                <svg viewBox="0 0 24 24" style="fill: var(--accent-green);"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <div>
+                    <strong>🛡️ ZERO Battery Drain Guarantee:</strong> Sensors only poll while the screen is ON. As soon as the screen turns off, sensor monitoring shuts down completely.
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Sensor Radar -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9 9 9 0 0 0 9 9 9 9 0 0 0 9-9 9 9 0 0 0-9-9zm0 16a7 7 0 0 1-7-7 7 7 0 0 1 7-7 7 7 0 0 1 7 7 7 7 0 0 1-7 7zm-1-11h2v6h-2zm0 8h2v2h-2z"/></svg>
+                    Live Sensor Visualizer
+                </div>
+                <button class="tag-pill" style="cursor: pointer;" onclick="fetchStatus()">Refresh</button>
+            </div>
+
+            <div class="sensor-dashboard">
+                <div class="sensor-card">
+                    <div class="sensor-label">Proximity Sensor</div>
+                    <div class="sensor-value far" id="live-prox">FAR</div>
+                </div>
+
+                <div class="sensor-card">
+                    <div class="sensor-label">Orientation</div>
+                    <div class="sensor-value" id="live-orient">FACE_UP</div>
+                </div>
+
+                <div class="sensor-card">
+                    <div class="sensor-label">Hardware Wake Keys</div>
+                    <div class="sensor-value" style="font-size: 13px;" id="live-keys">114, 115, 116</div>
+                </div>
+
+                <div class="sensor-card">
+                    <div class="sensor-label">Daemon Status</div>
+                    <div class="sensor-value" style="color: var(--accent-green);" id="live-daemon">RUNNING</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostics Logs -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    Activity Log
+                </div>
+                <button class="tag-pill" onclick="fetchLogs()">Reload</button>
+            </div>
+            <div class="log-box" id="log-box">Connecting to Galaxy Wake Master daemon...</div>
+        </div>
+    </div>
+
+    <!-- Floating Sticky Bottom Bar -->
+    <div class="bottom-bar">
+        <div style="font-size: 11px; color: var(--text-dim);">
+            Port 8096 | <span id="sync-status">Auto-Sync On</span>
+        </div>
+        <button class="btn-save" onclick="saveSettings()">Save & Apply</button>
+    </div>
+
+    <script>
+        const API_URL = '/cgi-bin/api.cgi';
+        let isPolling = true;
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2200);
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch(`${API_URL}?action=status`);
+                const data = await res.json();
+                if (data.success) {
+                    // Update screen state
+                    const scrText = document.getElementById('screen-state-text');
+                    scrText.innerText = data.screen.state;
+                    if (data.screen.is_on) {
+                        scrText.style.color = 'var(--accent-green)';
+                    } else {
+                        scrText.style.color = 'var(--accent-red)';
+                    }
+
+                    // Update live sensors
+                    const proxEl = document.getElementById('live-prox');
+                    proxEl.innerText = data.sensors.proximity_state;
+                    proxEl.className = 'sensor-value ' + (data.sensors.proximity_state === 'NEAR' ? 'near' : 'far');
+
+                    const orientEl = document.getElementById('live-orient');
+                    orientEl.innerText = data.sensors.orientation;
+                    if (data.sensors.orientation === 'FACE_DOWN') {
+                        orientEl.className = 'sensor-value face-down';
+                    } else {
+                        orientEl.className = 'sensor-value';
+                    }
+
+                    document.getElementById('live-keys').innerText = data.hardware.sec_wakeup_keys;
+                    document.getElementById('live-daemon').innerText = data.daemon.running ? `RUNNING (PID ${data.daemon.pid})` : 'STOPPED';
+
+                    // Update device info
+                    if (data.device && data.device.model) {
+                        document.getElementById('dev-info').innerText = `${data.device.model} • Android ${data.device.android}`;
+                    }
+
+                    // Populate form on first load if not touched
+                    if (!window.hasLoadedConfig) {
+                        window.hasLoadedConfig = true;
+                        document.getElementById('cfg_vol_up').checked = data.config.vol_up_wake == 1;
+                        document.getElementById('cfg_vol_down').checked = data.config.vol_down_wake == 1;
+                        document.getElementById('cfg_drop_vol').checked = data.config.drop_vol_on_wake == 1;
+                        document.getElementById('cfg_headset_hook').checked = data.config.headset_hook_wake == 1;
+                        document.getElementById('cfg_put_down').checked = data.config.put_down_sleep == 1;
+                        document.getElementById('cfg_face_down').checked = data.config.face_down_sleep == 1;
+                        document.getElementById('cfg_pocket').checked = data.config.pocket_sleep == 1;
+                        document.getElementById('cfg_flat_table').checked = data.config.flat_table_sleep == 1;
+                        document.getElementById('cfg_delay').value = data.config.sleep_delay || 2;
+                        document.getElementById('delay-val').innerText = (data.config.sleep_delay || 2) + 's';
+                        document.getElementById('cfg_vibrate').checked = data.config.vibrate_feedback == 1;
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function saveSettings() {
+            const params = new URLSearchParams({
+                action: 'save_config',
+                vol_up_wake: document.getElementById('cfg_vol_up').checked ? '1' : '0',
+                vol_down_wake: document.getElementById('cfg_vol_down').checked ? '1' : '0',
+                drop_vol_on_wake: document.getElementById('cfg_drop_vol').checked ? '1' : '0',
+                headset_hook_wake: document.getElementById('cfg_headset_hook').checked ? '1' : '0',
+                put_down_sleep: document.getElementById('cfg_put_down').checked ? '1' : '0',
+                face_down_sleep: document.getElementById('cfg_face_down').checked ? '1' : '0',
+                pocket_sleep: document.getElementById('cfg_pocket').checked ? '1' : '0',
+                flat_table_sleep: document.getElementById('cfg_flat_table').checked ? '1' : '0',
+                sleep_delay: document.getElementById('cfg_delay').value,
+                vibrate_feedback: document.getElementById('cfg_vibrate').checked ? '1' : '0',
+                hw_sysfs_wake: '1'
+            });
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params.toString()
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Settings Saved Instantly!');
+                    fetchStatus();
+                } else {
+                    showToast('Error saving settings');
+                }
+            } catch (e) {
+                showToast('Failed to save settings');
+            }
+        }
+
+        async function callApi(action, extraParams = '') {
+            try {
+                const res = await fetch(`${API_URL}?action=${action}${extraParams ? '&' + extraParams : ''}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(data.message || 'Action executed!');
+                    setTimeout(fetchStatus, 400);
+                }
+            } catch (e) {
+                showToast('Action failed');
+            }
+        }
+
+        async function fetchLogs() {
+            try {
+                const res = await fetch(`${API_URL}?action=get_logs`);
+                const data = await res.json();
+                if (data.success && data.logs) {
+                    document.getElementById('log-box').innerText = data.logs;
+                }
+            } catch (e) {}
+        }
+
+        // Auto sync loop
+        fetchStatus();
+        fetchLogs();
+        setInterval(() => {
+            if (isPolling) {
+                fetchStatus();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
