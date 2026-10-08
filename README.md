@@ -1,7 +1,7 @@
 # Galaxy Wake Master (Volume Wake & Put-Down Sleep)
 **Author:** hoc  
 **Module ID:** `galaxy_wake_master`  
-**Version:** `v1.0`  
+**Version:** `v1.1`  
 **Target:** Samsung Galaxy (One UI / Dimensity / MTK / Universal Android 10-14)  
 **Control Panel:** `http://127.0.0.1:8096`
 
@@ -32,17 +32,20 @@ Designed specifically for smartphones where the physical **Power Button is fault
 - **Systemless Keylayout Overlay**: Injects `WAKE_DROPPED` flags into `/system/usr/keylayout/Generic.kl`, `mtk-kpd.kl`, `gpio-keys.kl`, and `sec_keys.kl`.
 - **Event Guardian (`wake_master`)**: A lightweight background daemon blocks on kernel input events (`getevent -l`). When a volume key is pressed while the screen is asleep, it immediately triggers `input keyevent 224` (KEYCODE_WAKEUP) and restores volume levels.
 
-### 2. "Put Down to Sleep" (Wake-Down Engine)
-- **Face-Down Detection**: Checks proximity sensor (`NEAR`) and accelerometer Z-axis ($Z < -5.0 \text{ m/s}^2$ / negative vector).
-- **Pocket Auto-Sleep**: Detects vertical orientation ($Y < -5.0$) while proximity is covered (`NEAR`).
-- **Configurable Trigger Delay**: Prevents false triggers while holding or moving the device (default: 2.0 seconds).
-- **🛡️ ZERO Battery Drain Guarantee**: Sensor polling **ONLY runs while the screen is ON**. As soon as the display turns off, sensor monitoring immediately shuts down. The phone enters deep sleep with 0 wakeups.
+### 2. "Put Down to Sleep" (Native WakeSensor DEX Engine)
+- **High-Precision Sensor Daemon (`WakeSensor.dex`)**: Rather than relying on static or gated sysfs nodes (which freeze on Samsung One UI / MediaTek SensorHub), Galaxy Wake Master runs a lightweight native Java bytecode daemon via Android's `app_process`.
+- **Direct SensorHub Interfacing**: Connects directly to Android's `SensorManager`, reading raw streams from the physical `LSM6DSL Accelerometer` and `Ear Hover Proximity Sensor (ProToS Lite)`.
+- **Face-Down Detection**: Triggers sleep when phone is placed face-down on a flat surface ($Z \le -5.5 \text{ m/s}^2$).
+- **Pocket Auto-Sleep**: Detects inverted vertical orientation ($Y \le -6.0 \text{ m/s}^2$) with proximity covered (`NEAR`).
+- **Flat-Table Sleep**: Optional setting to sleep when placed flat face-up on a desk ($Z \ge 6.0 \text{ m/s}^2$).
+- **Configurable Trigger Delay**: Adjustable delay (default: 2.0 - 3.5s) to eliminate false triggers during active usage.
+- **🛡️ ZERO Battery Drain Guarantee**: Sensor listeners are **ONLY active while the screen is ON**. As soon as the screen locks, all sensor listeners are immediately unregistered from the SensorManager. The device enters deep standby sleep with 0% additional battery drain.
 
 ---
 
 ## 📱 How To Install & Use
 
-1. Download [`galaxy_wake_master_v1.0.zip`](https://github.com/vishalhoc/magisk-galaxy-wake-master/releases) from Releases.
-2. Open the **Magisk App** -> go to **Modules** -> tap **Install from storage** -> select `galaxy_wake_master_v1.0.zip`.
+1. Download [`galaxy_wake_master_v1.1.zip`](https://github.com/vishalhoc/magisk-galaxy-wake-master/releases) from Releases.
+2. Open the **Magisk App** -> go to **Modules** -> tap **Install from storage** -> select `galaxy_wake_master_v1.1.zip`.
 3. Reboot your device.
 4. After reboot, tap the **Action** button in the Magisk app (or open `http://127.0.0.1:8096`) to customize your wake keys and put-down sleep preferences!

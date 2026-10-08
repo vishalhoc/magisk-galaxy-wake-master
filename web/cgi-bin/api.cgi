@@ -87,8 +87,16 @@ case "$ACTION" in
             fi
         fi
 
-        # Sensor readings
-        prox_raw=$("$BIN" sensors 2>/dev/null | grep "Proximity:" | cut -d ' ' -f 2)
+        # Sensor readings from high-precision WakeSensor DEX cache
+        SENSOR_TMP="/data/local/tmp/wake_sensor.tmp"
+        if [ -f "$SENSOR_TMP" ]; then
+            prox_raw=$(grep -o 'PROX=[^;]*' "$SENSOR_TMP" | cut -d= -f2)
+            accel_raw=$(grep -o 'ACCEL=[^;]*' "$SENSOR_TMP" | cut -d= -f2)
+            orientation=$(grep -o 'ORIENT=[^;]*' "$SENSOR_TMP" | cut -d= -f2)
+            dist_raw=$(grep -o 'DIST=[^;]*' "$SENSOR_TMP" | cut -d= -f2)
+        fi
+
+        [ -z "$prox_raw" ] && prox_raw=$("$BIN" sensors 2>/dev/null | grep "Proximity:" | cut -d ' ' -f 2)
         [ -z "$prox_raw" ] && prox_raw="0"
         if [ "$prox_raw" = "1" ]; then
             prox_state="NEAR"
@@ -96,11 +104,12 @@ case "$ACTION" in
             prox_state="FAR"
         fi
 
-        accel_raw=$("$BIN" sensors 2>/dev/null | grep "Accel XYZ:" | cut -d ' ' -f 3-)
-        [ -z "$accel_raw" ] && accel_raw="0,0,1000"
+        [ -z "$accel_raw" ] && accel_raw=$("$BIN" sensors 2>/dev/null | grep "Accel XYZ:" | cut -d ' ' -f 3-)
+        [ -z "$accel_raw" ] && accel_raw="0.0,0.0,9.8"
 
-        orientation=$("$BIN" sensors 2>/dev/null | grep "Orientation:" | cut -d ' ' -f 2)
+        [ -z "$orientation" ] && orientation=$("$BIN" sensors 2>/dev/null | grep "Orientation:" | cut -d ' ' -f 2)
         [ -z "$orientation" ] && orientation="FACE_UP"
+
 
         # Hardware wakeup keys
         sec_keys=$(cat /sys/class/sec/sec_key/wakeup_keys 2>/dev/null | tr -d '\r\n')
